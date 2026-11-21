@@ -406,6 +406,60 @@ async function flush() {
   }
 }
 
+// Two-way sync: pull every row from the sheet and merge it into this device.
+// For an item both sides have, the newer updatedAt wins; an item with a change
+// still waiting in this device's queue keeps the local version until it is sent.
+function mergeRemote(remote) {
+  const pending = new Set(queue.map(q => q.id));
+  const byId = new Map(items.map(i => [i.id, i]));
+  let changed = false;
+  for (const r of remote) {
+    const local = byId.get(r.id);
+    if (!local) { items.push(r); changed = true; continue; }
+    if (pending.has(r.id)) continue;
+    if ((r.updatedAt || '') > (local.updatedAt || '')) { Object.assign(local, r); changed = true; }
+  }
+  if (changed) {
+    items.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    store(KEY.items, items);
+    if (!editingId) render(); // don't wipe a card the user is typing in
+  }
+  return changed;
+}
+
+let pulling = false;
+async function pull() {
+  const url = localStorage.getItem(KEY.url);
+  if (!url || !navigator.onLine || pulling) return;
+  pulling = true;
+  try {
+    let data;
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=list');
+      data = await res.json();
+    } catch (e) {
+      throw new Error('ดึงข้อมูลจากชีตไม่ได้ · ถ้าเพิ่งแก้ Code.gs ให้ Deploy เป็น New version');
+    }
+    if (!data || !data.ok || !Array.isArray(data.items)) throw new Error('สคริปต์ตอบกลับไม่ใช่รายการโน้ต');
+    mergeRemote(data.items);
+  } finally {
+    pulling = false;
+  }
+}
+
+// Send this device's changes first, then pull everyone else's
+async function syncAll() {
+  await flush();
+  if (!localStorage.getItem(KEY.url) || !navigator.onLine) return;
+  try {
+    await pull();
+    if (!queue.length) { showSyncError(''); setSync('ซิงก์แล้ว', 'ok'); }
+  } catch (e) {
+    showSyncError(e.message);
+    setSync('ดึงไม่ได้', 'err');
+  }
+}
+
 async function testConnection() {
   const url = $('scriptUrl').value.trim();
   const out = $('testResult');
@@ -537,7 +591,7 @@ $('recapActions').addEventListener('click', e => {
 // Settings
 $('saveSettings').addEventListener('click', () => {
   localStorage.setItem(KEY.url, $('scriptUrl').value.trim());
-  flush();
+  syncAll();
   setView('home');
 });
 $('exportCsv').addEventListener('click', exportCsv);
@@ -553,15 +607,17 @@ $('addType').addEventListener('click', () => {
   persist();
 });
 
-$('syncBtn').addEventListener('click', flush);
-window.addEventListener('online', flush);
+$('syncBtn').addEventListener('click', syncAll);
+window.addEventListener('online', syncAll);
+// Pull again whenever the app comes back to the screen (e.g. switching from another app on the phone)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncAll(); });
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js');
 }
 
 render();
-flush();
+syncAll();
 </script>
 </body>
 </html>
