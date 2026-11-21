@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mindbox</title>
+<meta name="theme-color" content="#1F3D2B">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#F6F1E7;--card:#FFFDF8;--brown:#7A5C3E;--green:#1F3D2B;--line:#D9C9B0;--sand:#EADBC4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--green);font-family:'IBM Plex Sans Thai',sans-serif;min-height:100vh}
+.app{max-width:480px;margin:0 auto;padding:20px 16px 96px;display:flex;flex-direction:column;gap:14px}
+header,.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+h1{margin:0;font-size:22px}
+button{font:inherit;cursor:pointer}
+.btn{min-height:44px;border-radius:12px;border:0;background:var(--green);color:var(--cream);padding:0 16px;font-weight:600}
+.btn.ghost{background:var(--card);color:var(--green);border:1px solid var(--brown)}
+.muted{font-size:13px;color:var(--brown)}
+.capture{background:var(--card);border:1.5px solid var(--green);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+textarea,input.text{font:inherit;color:var(--green)}
+textarea{border:0;outline:none;resize:none;background:transparent;font-size:16px;min-height:72px}
+input.text{width:100%;min-height:44px;border:1px solid var(--brown);border-radius:12px;padding:0 12px;background:var(--card)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{min-height:72px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--green)}
+.tile .e{font-size:22px}
+.tile .c{color:var(--brown)}
+.tile.add{border:1px dashed var(--brown);background:transparent}
+.banner{background:var(--sand);border-radius:12px;padding:12px;font-size:14px}
+ul{list-style:none;margin:0;padding:0}
+li.item{background:var(--card);border-radius:12px;padding:12px;margin-bottom:10px}
+li.item .t{font-size:15px;white-space:pre-wrap;word-break:break-word}
+li.item .m{font-size:12px;color:var(--brown);margin-top:4px}
+nav.bottom{position:fixed;bottom:0;left:0;right:0;background:var(--cream);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+nav.bottom button{background:none;border:0;color:var(--green);min-height:44px;min-width:88px;font-size:14px}
+nav.bottom button.on{font-weight:700;text-decoration:underline}
+.hidden{display:none!important}
+.card{background:var(--card);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.card .text{font-size:18px;font-weight:600;white-space:pre-wrap;word-break:break-word}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;border-radius:999px;border:1px solid var(--brown);background:var(--card);padding:0 12px;color:var(--green);font:inherit}
+.chip.on{background:var(--green);color:var(--cream);border-color:var(--green)}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.actions .btn{min-height:52px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Mindbox</h1>
+    <div class="row" style="justify-content:flex-end">
+      <span class="muted" id="pendingBadge"></span>
+      <button class="btn ghost" style="min-height:40px" id="syncBtn" type="button">ซิงก์</button>
+    </div>
+  </header>
+  <div class="banner hidden" id="syncError" role="alert"></div>
+
+  <section id="viewHome">
+    <div class="capture">
+      <label class="muted" for="cap">จดไว้ก่อน</label>
+      <textarea id="cap" rows="3" placeholder="จดอะไรก็ได้ เดี๋ยวค่อยแยกทีหลัง..."></textarea>
+      <div class="row">
+        <span class="muted">Enter เพื่อบันทึก · Shift+Enter ขึ้นบรรทัดใหม่</span>
+        <button class="btn" id="save" type="button">บันทึก</button>
+      </div>
+    </div>
+    <div class="banner" id="banner"></div>
+    <div class="muted">ประเภท</div>
+    <div class="tiles" id="tiles"></div>
+    <div class="muted" style="margin-top:6px">ล่าสุด</div>
+    <ul id="homeList"></ul>
+  </section>
+
+  <section id="viewType" class="hidden">
+    <div class="row">
+      <button class="btn ghost" id="backHome" type="button">← กลับ</button>
+      <span id="typeTitle" style="font-weight:700"></span>
+    </div>
+    <ul id="typeList" style="margin-top:12px"></ul>
+  </section>
+
+  <section id="viewRecap" class="hidden">
+    <h2 style="margin:0 0 6px;font-size:20px">รีแคปวันเสาร์</h2>
+    <div class="muted" id="recapSummary"></div>
+    <div class="muted" id="recapProgress" style="margin:8px 0 12px"></div>
+    <div id="recapCard"></div>
+    <div class="actions" id="recapActions" style="margin-top:14px"></div>
+  </section>
+
+  <section id="viewSettings" class="hidden">
+    <h2 style="margin:0 0 10px;font-size:20px">ตั้งค่า</h2>
+    <label class="muted" for="scriptUrl">Apps Script URL (วาง URL จากขั้น Deploy)</label>
+    <input class="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="row" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap">
+      <button class="btn ghost" id="testConn" type="button">ทดสอบการเชื่อมต่อ</button>
+      <button class="btn" id="saveSettings" type="button">บันทึก URL</button>
+    </div>
+    <div class="muted" id="testResult" role="status" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap">
+      <button class="btn ghost" id="resendAll" type="button">ส่งทั้งหมดอีกครั้ง</button>
+      <button class="btn ghost" id="exportCsv" type="button">ส่งออก CSV</button>
+    </div>
+    <div class="muted" style="margin:20px 0 6px">เพิ่มประเภท</div>
+    <div class="row">
+      <input class="text" id="newEmoji" placeholder="อิโมจิ" style="max-width:90px">
+      <input class="text" id="newName" placeholder="ชื่อประเภท">
+      <button class="btn" id="addType" type="button">เพิ่ม</button>
+    </div>
+  </section>
+</div>
+
+<nav class="bottom">
+  <button type="button" data-view="home" class="on">Inbox</button>
+  <button type="button" data-view="recap">รีแคป</button>
+  <button type="button" data-view="settings">ตั้งค่า</button>
+</nav>
+
+<script>
+const KEY = { items: 'mb_items', types: 'mb_types', queue: 'mb_queue', url: 'mb_url' };
+const DEFAULT_TYPES = [
+  { id: 'ideas', emoji: '💡', name: 'Ideas' },
+  { id: 'recipes', emoji: '🍳', name: 'Recipes' },
+  { id: 'quotes', emoji: '💬', name: 'Quotes' },
+  { id: 'stories', emoji: '✨', name: 'Good Stories' },
+  { id: 'main', emoji: '💼', name: 'Main Work' },
+  { id: 'freelance', emoji: '🧑‍💻', name: 'Freelance' },
+  { id: 'business', emoji: '🏪', name: 'Business' }
+];
+const STATUS_LABEL = { inbox: 'Inbox', doing: 'กำลังทำ', later: 'เก็บไว้' };
+const RECAP_ACTIONS = [
+  { label: 'ทำ', status: 'doing', cls: 'btn' },
+  { label: 'เก็บไว้', status: 'later', cls: 'btn ghost' },
+  { label: 'ทิ้ง', status: 'trash', cls: 'btn ghost' }
+];
+
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+const store = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const fmt = iso => new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+let items = load(KEY.items, []);
+let types = load(KEY.types, DEFAULT_TYPES);
+let queue = load(KEY.queue, []);
+let currentType = null;
+let recapIds = [];
+let recapIdx = 0;
+
+const typeOf = id => types.find(t => t.id === id);
+const typeLabel = id => { const t = typeOf(id); return t ? `${t.emoji} ${t.name}` : 'ยังไม่แยกประเภท'; };
+const activeItems = () => items.filter(i => i.status !== 'trash');
+const unsortedItems = () => activeItems().filter(i => !i.type);
+
+function persist() {
+  store(KEY.items, items);
+  store(KEY.types, types);
+  store(KEY.queue, queue);
+  render();
+  flush();
+}
+
+function changeItem(item, changes) {
+  Object.assign(item, changes, { updatedAt: new Date().toISOString() });
+  queue.push({ ...item });
+  persist();
+}
+
+function itemHtml(i) {
+  return `<li class="item"><div class="t">${esc(i.text)}</div>` +
+    `<div class="m">${fmt(i.createdAt)} · ${esc(typeLabel(i.type))} · ${STATUS_LABEL[i.status] || ''}</div></li>`;
+}
+
+function render() {
+  const active = activeItems();
+  const unsorted = unsortedItems().length;
+  $('pendingBadge').textContent = `รอจัด ${unsorted}`;
+  $('banner').textContent = unsorted
+    ? `มี ${unsorted} รายการยังไม่แยกประเภท · รีแคปวันเสาร์ 19:00`
+    : 'ทุกรายการถูกแยกประเภทแล้ว';
+  $('tiles').innerHTML = types.map(t => {
+    const n = active.filter(i => i.type === t.id).length;
+    return `<button class="tile" type="button" data-type="${esc(t.id)}"><span class="e">${esc(t.emoji)}</span>${esc(t.name)}<span class="c">${n}</span></button>`;
+  }).join('') + `<button class="tile add" type="button" data-add="1"><span class="e">+</span>เพิ่ม</button>`;
+  $('homeList').innerHTML = active.slice(0, 20).map(itemHtml).join('');
+  if (!$('viewType').classList.contains('hidden')) renderType();
+}
+
+function renderType() {
+  const t = typeOf(currentType);
+  $('typeTitle').textContent = t ? `${t.emoji} ${t.name}` : '';
+  const list = activeItems().filter(i => i.type === currentType);
+  $('typeList').innerHTML = list.length ? list.map(itemHtml).join('') : '<li class="muted">ยังไม่มีรายการในประเภทนี้</li>';
+}
+
+function renderRecap() {
+  const unsorted = unsortedItems();
+  const counts = {};
+  unsorted.forEach(i => { const k = i.type || 'other'; counts[k] = (counts[k] || 0) + 1; });
+  const parts = Object.keys(counts).map(k => (k === 'other' ? 'อื่นๆ' : typeOf(k).emoji) + ` ${counts[k]}`);
+  $('recapSummary').textContent = `ยังไม่แยก ${unsorted.length} รายการ${parts.length ? ' · ' + parts.join(' · ') : ''}`;
+
+  const current = items.find(i => i.id === recapIds[recapIdx]);
+  if (!recapIds.length || !current || current.status === 'trash') {
+    $('recapProgress').textContent = '';
+    $('recapCard').innerHTML = '<div class="card"><div class="text">ไม่มีรายการรอจัดประเภทแล้ว</div></div>';
+    $('recapActions').innerHTML = '';
+    return;
+  }
+  $('recapProgress').textContent = `รายการที่ ${recapIdx + 1} จาก ${recapIds.length}`;
+  $('recapCard').innerHTML = `<div class="card">
+    <div class="text">${esc(current.text)}</div>
+    <div class="muted">จดเมื่อ ${fmt(current.createdAt)}</div>
+    <div class="muted" style="margin-top:6px">เลือกประเภท</div>
+    <div class="chips">${types.map(t => `<button class="chip ${current.type === t.id ? 'on' : ''}" type="button" data-pick="${esc(t.id)}">${esc(t.emoji)} ${esc(t.name)}</button>`).join('')}</div>
+  </div>`;
+  $('recapActions').innerHTML = RECAP_ACTIONS.map(a => `<button class="${a.cls}" type="button" data-status="${a.status}">${a.label}</button>`).join('');
+}
+
+function openRecap() {
+  recapIds = unsortedItems().map(i => i.id);
+  recapIdx = 0;
+  renderRecap();
+}
+
+function renderTypeSettingsAndAll() { render(); }
+
+function setView(name) {
+  ['viewHome', 'viewType', 'viewRecap', 'viewSettings'].forEach(id => $(id).classList.add('hidden'));
+  const map = { home: 'viewHome', type: 'viewType', recap: 'viewRecap', settings: 'viewSettings' };
+  $(map[name]).classList.remove('hidden');
+  document.querySelectorAll('nav.bottom button').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+  if (name === 'home') render();
+  if (name === 'type') renderType();
+  if (name === 'recap') openRecap();
+  if (name === 'settings') $('scriptUrl').value = localStorage.getItem(KEY.url) || '';
+  window.scrollTo(0, 0);
+}
+
+// Sends ops and reads Apps Script's reply. Throws a Thai message that says what to fix.
+async function send(url, ops) {
+  let res, text;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ ops })
+    });
+    text = (await res.text()).trim();
+  } catch (e) {
+    throw new Error('ส่งไม่ถึง Google · เช็คว่า URL ลงท้ายด้วย /exec และตั้ง Who has access เป็น Anyone');
+  }
+  if (res.ok && text === 'ok') return;
+  if (/doPost/.test(text)) throw new Error('ไม่เจอ doPost · ใน Apps Script ให้ Deploy เป็น New version');
+  if (/accounts\.google|<html/i.test(text)) throw new Error('Google ขอให้ล็อกอิน · ตั้ง Who has access เป็น Anyone แล้ว Deploy ใหม่');
+  throw new Error('สคริปต์ตอบกลับผิดปกติ: ' + text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120));
+}
+
+function showSyncError(msg) {
+  $('syncError').textContent = msg ? `ซิงก์ไม่สำเร็จ · ${msg}` : '';
+  $('syncError').classList.toggle('hidden', !msg);
+}
+
+let flushing = false;
+async function flush() {
+  const url = localStorage.getItem(KEY.url);
+  if (!url || !queue.length || !navigator.onLine || flushing) {
+    $('syncBtn').textContent = !url ? 'ยังไม่ตั้งค่า' : (queue.length ? `รอส่ง ${queue.length}` : 'ซิงก์แล้ว');
+    return;
+  }
+  flushing = true;
+  $('syncBtn').textContent = 'กำลังส่ง...';
+  try {
+    while (queue.length) {
+      const batch = queue.slice(0, 50);
+      await send(url, batch);
+      queue = queue.slice(batch.length);
+      store(KEY.queue, queue);
+    }
+    showSyncError('');
+    $('syncBtn').textContent = 'ซิงก์แล้ว';
+  } catch (e) {
+    showSyncError(e.message);
+    $('syncBtn').textContent = `รอส่ง ${queue.length}`;
+  } finally {
+    flushing = false;
+  }
+}
+
+async function testConnection() {
+  const url = $('scriptUrl').value.trim();
+  const out = $('testResult');
+  if (!/\/exec$/.test(url)) { out.textContent = '❌ URL ต้องลงท้ายด้วย /exec'; return; }
+  out.textContent = 'กำลังทดสอบ...';
+  try {
+    await send(url, []);
+    out.textContent = '✅ เชื่อมต่อได้ · กด บันทึก URL แล้วลองจดหนึ่งรายการ';
+  } catch (e) {
+    out.textContent = '❌ ' + e.message;
+  }
+}
+
+function resendAll() {
+  queue = items.map(i => ({ ...i }));
+  $('testResult').textContent = `ใส่ ${queue.length} รายการกลับเข้าคิวแล้ว กำลังส่ง...`;
+  persist();
+}
+
+function exportCsv() {
+  const head = ['id', 'text', 'type', 'status', 'createdAt', 'updatedAt'];
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = items.map(i => [i.id, i.text, i.type || '', i.status, i.createdAt, i.updatedAt].map(q).join(','));
+  const blob = new Blob(['﻿' + [head.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mindbox-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Capture
+function saveCapture() {
+  const text = $('cap').value.trim();
+  if (!text) return;
+  const now = new Date().toISOString();
+  const item = { id: uid(), text, type: null, status: 'inbox', createdAt: now, updatedAt: now };
+  items.unshift(item);
+  queue.push({ ...item });
+  $('cap').value = '';
+  persist();
+}
+$('save').addEventListener('click', saveCapture);
+$('cap').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); saveCapture(); }
+});
+
+// Navigation
+document.querySelectorAll('nav.bottom button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+$('tiles').addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.dataset.add) { setView('settings'); return; }
+  currentType = t.dataset.type;
+  setView('type');
+});
+$('backHome').addEventListener('click', () => setView('home'));
+
+// Recap
+$('recapCard').addEventListener('click', e => {
+  const b = e.target.closest('[data-pick]');
+  if (!b) return;
+  const item = items.find(i => i.id === recapIds[recapIdx]);
+  if (item) changeItem(item, { type: b.dataset.pick });
+  renderRecap();
+});
+$('recapActions').addEventListener('click', e => {
+  const b = e.target.closest('[data-status]');
+  if (!b) return;
+  const item = items.find(i => i.id === recapIds[recapIdx]);
+  if (item) changeItem(item, { status: b.dataset.status });
+  recapIdx++;
+  renderRecap();
+});
+
+// Settings
+$('saveSettings').addEventListener('click', () => {
+  localStorage.setItem(KEY.url, $('scriptUrl').value.trim());
+  flush();
+  setView('home');
+});
+$('exportCsv').addEventListener('click', exportCsv);
+$('testConn').addEventListener('click', testConnection);
+$('resendAll').addEventListener('click', resendAll);
+$('addType').addEventListener('click', () => {
+  const name = $('newName').value.trim();
+  const emoji = $('newEmoji').value.trim() || '🏷️';
+  if (!name) return;
+  types.push({ id: uid(), emoji, name });
+  $('newName').value = '';
+  $('newEmoji').value = '';
+  persist();
+});
+
+$('syncBtn').addEventListener('click', flush);
+window.addEventListener('online', flush);
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+render();
+flush();
+</script>
+</body>
+</html>
