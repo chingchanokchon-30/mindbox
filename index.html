@@ -29,6 +29,11 @@ input.text{width:100%;min-height:44px;border:1px solid var(--brown);border-radiu
 .tile .e{font-size:22px}
 .tile .c{color:var(--brown)}
 .tile.add{border:1px dashed var(--brown);background:transparent}
+.tile.pic{border:0;background:transparent;min-height:0;padding:0;gap:4px}
+.tile .ti{width:100%;max-width:76px;aspect-ratio:1;border-radius:22%;display:block}
+.tile.pic.sel .ti{outline:3px solid var(--green);outline-offset:2px}
+.tile .nm{font-size:12px;line-height:1.2;text-align:center;word-break:break-word}
+.recapBar{position:fixed;left:0;right:0;bottom:calc(61px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;padding:10px 16px;background:var(--cream)}
 .banner{background:var(--sand);border-radius:12px;padding:12px;font-size:14px}
 ul{list-style:none;margin:0;padding:0}
 li.item{background:var(--card);border-radius:12px;padding:12px;margin-bottom:10px}
@@ -54,6 +59,7 @@ nav.bottom button.on{font-weight:700;text-decoration:underline}
     <div class="row" style="justify-content:flex-end">
       <span class="muted" id="pendingBadge"></span>
       <button class="btn ghost" style="min-height:40px" id="syncBtn" type="button">ซิงก์</button>
+      <button class="btn ghost" style="min-height:40px;padding:0 10px" id="settingsBtn" type="button" aria-label="ตั้งค่า">⚙️</button>
     </div>
   </header>
   <div class="banner hidden" id="syncError" role="alert"></div>
@@ -68,26 +74,26 @@ nav.bottom button.on{font-weight:700;text-decoration:underline}
       </div>
     </div>
     <div class="banner" id="banner"></div>
-    <div class="muted">ประเภท</div>
-    <div class="tiles" id="tiles"></div>
     <div class="muted" style="margin-top:6px">ล่าสุด</div>
     <ul id="homeList"></ul>
   </section>
 
   <section id="viewType" class="hidden">
-    <div class="row">
-      <button class="btn ghost" id="backHome" type="button">← กลับ</button>
-      <span id="typeTitle" style="font-weight:700"></span>
-    </div>
-    <ul id="typeList" style="margin-top:12px"></ul>
+    <h2 style="margin:0 0 12px;font-size:20px">ตามประเภท</h2>
+    <div class="tiles" id="tiles"></div>
+    <div id="typeTitle" style="font-weight:700;margin:20px 0 10px"></div>
+    <ul id="typeList"></ul>
   </section>
 
-  <section id="viewRecap" class="hidden">
+  <section id="viewRecap" class="hidden" style="padding-bottom:110px">
     <h2 style="margin:0 0 6px;font-size:20px">รีแคปวันเสาร์</h2>
     <div class="muted" id="recapSummary"></div>
     <div class="muted" id="recapProgress" style="margin:8px 0 12px"></div>
     <div id="recapCard"></div>
-    <div class="actions" id="recapActions" style="margin-top:14px"></div>
+    <div class="recapBar hidden" id="recapBar">
+      <div class="actions" id="recapActions"></div>
+      <div class="muted" style="text-align:center;font-size:12px;margin-top:8px">บันทึกลง Google Sheets เมื่อกดแล้ว</div>
+    </div>
   </section>
 
   <section id="viewSettings" class="hidden">
@@ -114,8 +120,8 @@ nav.bottom button.on{font-weight:700;text-decoration:underline}
 
 <nav class="bottom">
   <button type="button" data-view="home" class="on">Inbox</button>
+  <button type="button" data-view="type">ตามประเภท</button>
   <button type="button" data-view="recap">รีแคป</button>
-  <button type="button" data-view="settings">ตั้งค่า</button>
 </nav>
 
 <script>
@@ -129,7 +135,9 @@ const DEFAULT_TYPES = [
   { id: 'freelance', emoji: '🧑‍💻', name: 'Freelance' },
   { id: 'business', emoji: '🏪', name: 'Business' }
 ];
-const STATUS_LABEL = { inbox: 'Inbox', doing: 'กำลังทำ', later: 'เก็บไว้' };
+// Pixel icons for the built-in types (icons/<file>.png). Types the user adds keep their emoji.
+const TYPE_ICONS = { ideas: 'ideas', recipes: 'recipes', quotes: 'quotes', stories: 'good_stories', main: 'main_work', freelance: 'freelance', business: 'business' };
+const STATUS_LABEL ={ inbox: 'Inbox', doing: 'กำลังทำ', later: 'เก็บไว้' };
 const RECAP_ACTIONS = [
   { label: 'ทำ', status: 'doing', cls: 'btn' },
   { label: 'เก็บไว้', status: 'later', cls: 'btn ghost' },
@@ -183,17 +191,27 @@ function render() {
     : 'ทุกรายการถูกแยกประเภทแล้ว';
   $('tiles').innerHTML = types.map(t => {
     const n = active.filter(i => i.type === t.id).length;
-    return `<button class="tile" type="button" data-type="${esc(t.id)}"><span class="e">${esc(t.emoji)}</span>${esc(t.name)}<span class="c">${n}</span></button>`;
+    const icon = TYPE_ICONS[t.id];
+    const sel = t.id === currentType ? ' sel' : '';
+    // Built-in icons already show the type name, so their label is only for screen readers.
+    // Types the user adds get the "New" icon with their name underneath.
+    return icon
+      ? `<button class="tile pic${sel}" type="button" data-type="${esc(t.id)}" aria-label="${esc(t.name)} ${n} รายการ"><img class="ti" src="icons/${icon}.png" alt=""><span class="c">${n}</span></button>`
+      : `<button class="tile pic${sel}" type="button" data-type="${esc(t.id)}" aria-label="${esc(t.name)} ${n} รายการ"><img class="ti" src="icons/add.png" alt=""><span class="nm">${esc(t.name)}</span><span class="c">${n}</span></button>`;
   }).join('') + `<button class="tile add" type="button" data-add="1"><span class="e">+</span>เพิ่ม</button>`;
   $('homeList').innerHTML = active.slice(0, 20).map(itemHtml).join('');
   if (!$('viewType').classList.contains('hidden')) renderType();
 }
 
 function renderType() {
+  if (!typeOf(currentType)) currentType = types[0] ? types[0].id : null;
+  document.querySelectorAll('#tiles [data-type]').forEach(b => b.classList.toggle('sel', b.dataset.type === currentType));
   const t = typeOf(currentType);
   $('typeTitle').textContent = t ? `${t.emoji} ${t.name}` : '';
   const list = activeItems().filter(i => i.type === currentType);
-  $('typeList').innerHTML = list.length ? list.map(itemHtml).join('') : '<li class="muted">ยังไม่มีรายการในประเภทนี้</li>';
+  $('typeList').innerHTML = list.length
+    ? list.map(i => `<li class="item"><div class="t">${esc(i.text)}</div><div class="m">${fmt(i.createdAt)}</div></li>`).join('')
+    : '<li class="muted">ยังไม่มีรายการในประเภทนี้</li>';
 }
 
 function renderRecap() {
@@ -201,15 +219,17 @@ function renderRecap() {
   const counts = {};
   unsorted.forEach(i => { const k = i.type || 'other'; counts[k] = (counts[k] || 0) + 1; });
   const parts = Object.keys(counts).map(k => (k === 'other' ? 'อื่นๆ' : typeOf(k).emoji) + ` ${counts[k]}`);
-  $('recapSummary').textContent = `ยังไม่แยก ${unsorted.length} รายการ${parts.length ? ' · ' + parts.join(' · ') : ''}`;
+  $('recapSummary').textContent = `เสาร์ 19:00 · ยังไม่แยก ${unsorted.length} รายการ${parts.length ? ': ' + parts.join(' · ') : ''}`;
 
   const current = items.find(i => i.id === recapIds[recapIdx]);
   if (!recapIds.length || !current || current.status === 'trash') {
     $('recapProgress').textContent = '';
     $('recapCard').innerHTML = '<div class="card"><div class="text">ไม่มีรายการรอจัดประเภทแล้ว</div></div>';
     $('recapActions').innerHTML = '';
+    $('recapBar').classList.add('hidden');
     return;
   }
+  $('recapBar').classList.remove('hidden');
   $('recapProgress').textContent = `รายการที่ ${recapIdx + 1} จาก ${recapIds.length}`;
   $('recapCard').innerHTML = `<div class="card">
     <div class="text">${esc(current.text)}</div>
@@ -344,9 +364,9 @@ $('tiles').addEventListener('click', e => {
   if (!t) return;
   if (t.dataset.add) { setView('settings'); return; }
   currentType = t.dataset.type;
-  setView('type');
+  renderType();
 });
-$('backHome').addEventListener('click', () => setView('home'));
+$('settingsBtn').addEventListener('click', () => setView('settings'));
 
 // Recap
 $('recapCard').addEventListener('click', e => {

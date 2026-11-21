@@ -1,4 +1,4 @@
-const CACHE = 'mindbox-v1';
+const CACHE = 'mindbox-v2';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
