@@ -38,6 +38,12 @@ li.item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;ba
 #syncBtn[data-state=ok]{background:var(--leaf);box-shadow:var(--bd),0 6px 0 0 var(--leaf-d)}
 #syncBtn[data-state=wait]{background:var(--sand)}
 #syncBtn[data-state=err]{background:#F8B9C6}
+/* Type picker in the capture box: one scrollable row so it stays short */
+.chips.capTypes{flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:2px 2px 6px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.chips.capTypes .chip{flex:none;min-height:40px;padding:0 10px;font-size:14px;white-space:nowrap}
+/* Search */
+input.search{margin-top:4px}
+mark{background:var(--leaf);color:var(--green);padding:0 1px}
 /* Edit / delete */
 li.item .t{padding-right:46px}
 li.item .ib{position:absolute;top:8px;right:8px;width:40px;height:40px;border:0;background:var(--card);color:var(--green);font-size:18px;line-height:1;box-shadow:var(--bd2)}
@@ -118,13 +124,16 @@ nav.bottom button.on{background:var(--leaf);font-weight:700;box-shadow:var(--bd2
     <div class="capture">
       <label class="label" for="cap">จดไว้ก่อน</label>
       <textarea id="cap" rows="3" placeholder="จดอะไรก็ได้ เดี๋ยวค่อยแยกทีหลัง..."></textarea>
+      <div class="muted">รู้ประเภทแล้ว? เลือกได้เลย (ไม่เลือกก็ได้)</div>
+      <div class="chips capTypes" id="capTypes" role="group" aria-label="ประเภทของโน้ตนี้"></div>
       <div class="row">
-        <span class="muted">Enter เพื่อบันทึก · Shift+Enter ขึ้นบรรทัดใหม่</span>
+        <span class="muted">Enter ขึ้นบรรทัดใหม่ · กดบันทึกเมื่อจดเสร็จ</span>
         <button class="btn" id="save" type="button">บันทึก</button>
       </div>
     </div>
     <div class="banner" id="banner"></div>
-    <div class="label" style="margin-top:6px">ล่าสุด</div>
+    <input class="text search" id="q" type="search" placeholder="🔍 ค้นหาโน้ต..." aria-label="ค้นหาโน้ต" autocomplete="off">
+    <div class="label" id="listLabel" style="margin-top:6px">ล่าสุด</div>
     <ul id="homeList"></ul>
   </section>
 
@@ -249,7 +258,7 @@ const emptyHtml = msg => `<li class="empty">${EMPTY_ART}<span>${msg}</span></li>
 let editingId = null;
 let deleteArmed = false;
 
-function itemHtml(i, showMeta = true) {
+function itemHtml(i, showMeta = true, q = '') {
   const head = `<li class="item${i.id === editingId ? ' editing' : ''}" style="--tc:${typeColor(i.type)}" data-id="${esc(i.id)}">`;
   if (i.id === editingId) {
     return head +
@@ -263,7 +272,7 @@ function itemHtml(i, showMeta = true) {
   const meta = showMeta
     ? `${fmt(i.createdAt)} · <span class="tag">${esc(typeLabel(i.type))}</span> · ${STATUS_LABEL[i.status] || ''}`
     : fmt(i.createdAt);
-  return head + `<div class="t">${esc(i.text)}</div><div class="m">${meta}</div>` +
+  return head + `<div class="t">${highlight(i.text, q)}</div><div class="m">${meta}</div>` +
     `<button class="ib" type="button" data-act="edit" aria-label="แก้ไขหรือลบ">✎</button></li>`;
 }
 
@@ -289,9 +298,8 @@ function render() {
       ? `<button class="tile pic${sel}" type="button" data-type="${esc(t.id)}" aria-label="${esc(t.name)} ${n} รายการ"><img class="ti" src="icons/${icon}.png" alt=""><span class="c">${n}</span></button>`
       : `<button class="tile pic${sel}" type="button" data-type="${esc(t.id)}" aria-label="${esc(t.name)} ${n} รายการ"><img class="ti" src="icons/add.png" alt=""><span class="nm">${esc(t.name)}</span><span class="c">${n}</span></button>`;
   }).join('') + `<button class="tile add" type="button" data-add="1"><span class="e">+</span>เพิ่ม</button>`;
-  $('homeList').innerHTML = active.length
-    ? active.slice(0, 20).map(i => itemHtml(i)).join('')
-    : emptyHtml('กล่องยังว่าง ลองจดอะไรสักอย่าง');
+  renderCapTypes();
+  renderHomeList();
   if (!$('viewType').classList.contains('hidden')) renderType();
 }
 
@@ -491,21 +499,67 @@ function exportCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-// Capture
+// Capture: optional type picked before saving (cleared after each save)
+let capType = null;
+function renderCapTypes() {
+  $('capTypes').innerHTML = types.map(t =>
+    `<button class="chip${capType === t.id ? ' on' : ''}" type="button" data-cap="${esc(t.id)}" aria-pressed="${capType === t.id}">${esc(t.emoji)} ${esc(t.name)}</button>`
+  ).join('');
+}
+$('capTypes').addEventListener('click', e => {
+  const b = e.target.closest('[data-cap]');
+  if (!b) return;
+  capType = capType === b.dataset.cap ? null : b.dataset.cap; // tap again to unselect
+  renderCapTypes();
+});
+
 function saveCapture() {
   const text = $('cap').value.trim();
   if (!text) return;
   const now = new Date().toISOString();
-  const item = { id: uid(), text, type: null, status: 'inbox', createdAt: now, updatedAt: now };
+  const item = { id: uid(), text, type: capType, status: 'inbox', createdAt: now, updatedAt: now };
   items.unshift(item);
   queue.push({ ...item });
   $('cap').value = '';
+  capType = null;
   persist();
 }
 $('save').addEventListener('click', saveCapture);
+// Enter makes a new line; Cmd/Ctrl+Enter is a keyboard shortcut for บันทึก on a computer
 $('cap').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); saveCapture(); }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); saveCapture(); }
 });
+
+// Search: filters every note (not just the latest 20) by its text or type name
+const norm = s => String(s).toLocaleLowerCase('th');
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const lower = norm(text), nq = norm(q);
+  let out = '', i = 0, k;
+  while ((k = lower.indexOf(nq, i)) !== -1) {
+    out += esc(text.slice(i, k)) + '<mark>' + esc(text.slice(k, k + q.length)) + '</mark>';
+    i = k + q.length;
+  }
+  return out + esc(text.slice(i));
+}
+function renderHomeList() {
+  const q = $('q').value.trim();
+  const active = activeItems();
+  if (!q) {
+    $('listLabel').textContent = 'ล่าสุด';
+    $('homeList').innerHTML = active.length
+      ? active.slice(0, 20).map(i => itemHtml(i)).join('')
+      : emptyHtml('กล่องยังว่าง ลองจดอะไรสักอย่าง');
+    return;
+  }
+  const nq = norm(q);
+  const hits = active.filter(i => norm(i.text).includes(nq) || norm(typeLabel(i.type)).includes(nq));
+  $('listLabel').textContent = `ผลการค้นหา ${hits.length} รายการ`;
+  $('homeList').innerHTML = hits.length
+    ? hits.map(i => itemHtml(i, true, q)).join('')
+    : emptyHtml(`ไม่เจอโน้ตที่มีคำว่า "${esc(q)}"`);
+}
+$('q').addEventListener('input', renderHomeList);
 
 // Edit / delete a card (Inbox and by-type lists share one handler)
 let undoTimer = null;
